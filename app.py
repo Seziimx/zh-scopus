@@ -205,8 +205,11 @@ with tab_cards:
     for _, row in filtered.iterrows():
         with st.container():
             st.markdown(f"### {row.get('title', 'Без названия')}")
+            
+            # Авторы построчно
             authors_fmt = str(row.get("authors_full", "—")).replace(";", "\n")
             st.markdown(f"**Авторы:**\n{authors_fmt}")
+            
             st.markdown(f"**Источник:** {row.get('source', '—')}")
             st.markdown(
                 f"**Год:** {row.get('year', '—')} | "
@@ -214,11 +217,19 @@ with tab_cards:
                 f"**Процентиль:** {row.get('percentile_2024', '—')}"
             )
             st.markdown(f"**Цитирования:** {row.get('cited_by', 0)}")
+
+            # 🔹 Ссылки
+            links = []
             if pd.notna(row.get("doi_link", None)):
-                st.markdown(f"[DOI]({row['doi_link']})")
-            elif pd.notna(row.get("url", None)):
-                st.markdown(f"[Ссылка]({row['url']})")
+                links.append(f"[DOI]({row['doi_link']})")
+            if pd.notna(row.get("url", None)):
+                links.append(f"[Scopus ссылка]({row['url']})")
+            
+            if links:
+                st.markdown(" | ".join(links))
+
             st.markdown("---")
+
 
 with tab_sources:
     st.subheader("Топ источников")
