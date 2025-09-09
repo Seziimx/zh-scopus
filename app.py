@@ -191,7 +191,6 @@ with tab_table:
 
     filtered_display = filtered.copy().reset_index(drop=True)
     filtered_display.index = filtered_display.index + 1
-    filtered_display.insert(0, "№", filtered_display.index)
 
     # Авторы: заменяем ";" на перенос строки
     if "authors_raw" in filtered_display.columns:
@@ -203,7 +202,7 @@ with tab_table:
     else:
         filtered_display["authors_fmt"] = "—"
 
-    show_cols = ["№", "authors_fmt", "title", "year", "source",
+    show_cols = ["authors_fmt", "title", "year", "source",
                  "quartile", "percentile_2024", "cited_by",
                  "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered_display.columns]
