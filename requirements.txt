@@ -1,12 +1,5 @@
-# Web-интерфейс
-streamlit==1.36.0
-
-# Работа с таблицами и данными
-pandas==2.2.2
-numpy==1.26.4
-
-# Работа с Excel
-openpyxl==3.1.5
-
-# Экспорт PDF
-reportlab==4.2.2
+streamlit
+pandas
+numpy
+openpyxl
+reportlab
