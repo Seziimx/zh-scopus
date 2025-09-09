@@ -178,20 +178,24 @@ tab_table, tab_cards, tab_sources, tab_authors = st.tabs(
 
 with tab_table:
     st.subheader("Результаты фильтрации")
-    
-    # Добавляем нумерацию начиная с 1
-    filtered_display = filtered.copy()
-    filtered_display.insert(0, "№", range(1, len(filtered_display) + 1))
-    
-    # Авторы из "authors_raw", форматируем
+
+    # Нумерация + формат авторов
+    filtered_display = filtered.copy().reset_index(drop=True)
+    filtered_display.index = filtered_display.index + 1
+    filtered_display.insert(0, "№", filtered_display.index)
+
+    # Авторы: берём из "authors_raw" и ставим через Enter
     if "authors_raw" in filtered_display.columns:
         filtered_display["authors_fmt"] = filtered_display["authors_raw"].astype(str).str.replace(";", "\n")
-        show_cols = ["№", "authors_fmt", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
     else:
-        show_cols = ["№", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
+        filtered_display["authors_fmt"] = "—"
 
+    show_cols = ["№", "authors_fmt", "title", "year", "source", "quartile",
+                 "percentile_2024", "cited_by", "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered_display.columns]
+
     st.dataframe(filtered_display[show_cols], use_container_width=True, height=500)
+
 
 
     # Экспорт
