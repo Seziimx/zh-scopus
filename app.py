@@ -196,19 +196,21 @@ with tab_table:
 
     # Экспорт
     st.markdown("### Экспорт")
-    csv_bytes = filtered[show_cols].to_csv(index=False).encode("utf-8-sig")
-    st.download_button("⬇️ CSV", csv_bytes, file_name="zh_scopus_export.csv", mime="text/csv")
+
+    export_cols = [c for c in show_cols if c in filtered_display.columns]
+
+    csv_bytes = filtered_display[export_cols].to_csv(index=False).encode("utf-8-sig")
+    st.download_button("⬇️ Скачать CSV", csv_bytes, file_name="zh_scopus_export.csv", mime="text/csv")
 
     excel_buffer = BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-        filtered[show_cols].to_excel(writer, index=False, sheet_name="Export")
-    st.download_button("⬇️ Excel", excel_buffer.getvalue(),
-                       file_name="zh_scopus_export.xlsx",
+        filtered_display[export_cols].to_excel(writer, index=False, sheet_name="Export")
+    st.download_button("⬇️ Скачать Excel", excel_buffer.getvalue(), file_name="zh_scopus_export.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     try:
-        pdf_bytes = dataframe_to_pdf_bytes(filtered[show_cols], title="Zh Scopus — Отчёт")
-        st.download_button("⬇️ PDF", pdf_bytes, file_name="zh_scopus_report.pdf", mime="application/pdf")
+        pdf_bytes = dataframe_to_pdf_bytes(filtered_display[export_cols], title="Zh Scopus — Отчёт (фильтр)")
+        st.download_button("⬇️ Скачать PDF (бета)", pdf_bytes, file_name="zh_scopus_report.pdf", mime="application/pdf")
     except Exception as e:
         st.warning(f"PDF экспорт недоступен: {e}")
 
