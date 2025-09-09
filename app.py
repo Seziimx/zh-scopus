@@ -10,6 +10,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# Включаем перенос строк в dataframe
+st.markdown("""
+    <style>
+    .stDataFrame td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        max-width: 300px; /* можно менять ширину ячеек */
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Header
 col_logo, col_title = st.columns([1, 4])
@@ -179,17 +189,16 @@ tab_table, tab_cards, tab_sources, tab_authors = st.tabs(
 with tab_table:
     st.subheader("Результаты фильтрации")
 
-    # Копия данных + нумерация
     filtered_display = filtered.copy().reset_index(drop=True)
     filtered_display.index = filtered_display.index + 1
     filtered_display.insert(0, "№", filtered_display.index)
 
-    # Авторы с <br> вместо ";"
+    # Авторы: заменяем ";" на перенос строки
     if "authors_raw" in filtered_display.columns:
         filtered_display["authors_fmt"] = (
             filtered_display["authors_raw"]
             .astype(str)
-            .str.replace(";", "<br>")
+            .str.replace(";", "\n")
         )
     else:
         filtered_display["authors_fmt"] = "—"
@@ -199,13 +208,8 @@ with tab_table:
                  "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered_display.columns]
 
-    # Формируем HTML-таблицу
-    html_table = filtered_display[show_cols].to_html(
-        escape=False,       # чтобы <br> не экранировалось
-        index=False
-    )
+    st.dataframe(filtered_display[show_cols], use_container_width=True, height=500)
 
-    st.markdown(html_table, unsafe_allow_html=True)
 
 
 
