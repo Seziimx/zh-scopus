@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -38,6 +38,7 @@ def load_data(path: str, sheet: str = "ARTICLE") -> pd.DataFrame:
         "Процентиль 2024": "percentile_2024",
     }
     df = df.rename(columns=rename_map)
+
     # Ensure types
     if "year" in df.columns:
         df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
@@ -45,6 +46,13 @@ def load_data(path: str, sheet: str = "ARTICLE") -> pd.DataFrame:
         df["cited_by"] = pd.to_numeric(df["cited_by"], errors="coerce").fillna(0).astype(int)
     if "percentile_2024" in df.columns:
         df["percentile_2024"] = pd.to_numeric(df["percentile_2024"], errors="coerce")
+
+    # DOI → ссылка
+    if "doi" in df.columns:
+        df["doi_link"] = df["doi"].apply(
+            lambda x: f"https://doi.org/{x.strip()}" if pd.notna(x) and str(x).strip() != "" else None
+        )
+
     # For search: lowercase helpers
     for col in ["authors_raw", "authors_full", "title", "source"]:
         if col in df.columns:
@@ -82,10 +90,10 @@ percentile_range = st.sidebar.slider("Процентиль 2024", min_value=0, m
                                      value=(0, 100), step=1)
 
 search_query = st.sidebar.text_input("Поиск (автор/название/источник)", value="").strip().lower()
+search_only_sources = st.sidebar.checkbox("Искать только по источникам")
 
 # ============ Filtering Logic ============
 mask = pd.Series(True, index=df.index)
-
 mask &= df["year"].between(year_range[0], year_range[1])
 
 if "quartile" in df.columns:
@@ -96,13 +104,16 @@ if "percentile_2024" in df.columns:
     mask &= (p >= percentile_range[0]) & (p <= percentile_range[1])
 
 if search_query:
-    any_field = (
-        df.get("_authors_raw_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
-        df.get("_authors_full_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
-        df.get("_title_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
-        df.get("_source_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False)
-    )
-    mask &= any_field
+    if search_only_sources:
+        mask &= df.get("_source_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False)
+    else:
+        any_field = (
+            df.get("_authors_raw_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
+            df.get("_authors_full_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
+            df.get("_title_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
+            df.get("_source_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False)
+        )
+        mask &= any_field
 
 filtered = df[mask].copy()
 
@@ -142,7 +153,7 @@ tab_table, tab_cards, tab_sources, tab_authors = st.tabs(["📊 Таблица",
 
 with tab_table:
     st.subheader("Результаты фильтрации")
-    show_cols = ["authors_full", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi", "url", "issn"]
+    show_cols = ["authors_full", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered.columns]
     st.dataframe(filtered[show_cols], use_container_width=True, height=500)
 
@@ -168,7 +179,9 @@ with tab_cards:
     for _, row in filtered.iterrows():
         with st.container():
             st.markdown(f"### {row.get('title', 'Без названия')}")
-            st.markdown(f"**Авторы:** {row.get('authors_full', '—')}")
+            # Авторы с новой строки
+            authors_fmt = str(row.get("authors_full", "—")).replace(";", "\n")
+            st.markdown(f"**Авторы:**\n{authors_fmt}")
             st.markdown(f"**Источник:** {row.get('source', '—')}")
             st.markdown(
                 f"**Год:** {row.get('year', '—')} | "
@@ -176,8 +189,8 @@ with tab_cards:
                 f"**Процентиль:** {row.get('percentile_2024', '—')}"
             )
             st.markdown(f"**Цитирования:** {row.get('cited_by', 0)}")
-            if pd.notna(row.get("doi", None)):
-                st.markdown(f"[DOI]({row['doi']})")
+            if pd.notna(row.get("doi_link", None)):
+                st.markdown(f"[DOI]({row['doi_link']})")
             elif pd.notna(row.get("url", None)):
                 st.markdown(f"[Ссылка]({row['url']})")
             st.markdown("---")
