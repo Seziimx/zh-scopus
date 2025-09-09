@@ -158,27 +158,87 @@ elif sort_option == "Источник (A–Z)":
 elif sort_option == "Источник (Z–A)":
     filtered = filtered.sort_values("source", ascending=False)
 
-# ================= MAIN ==================
-st.subheader("Результаты фильтрации")
-show_cols = ["authors_full", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
-st.dataframe(filtered[show_cols], use_container_width=True, height=500)
+# ================= KPI ==================
+k1, k2, k3, k4 = st.columns(4)
+with k1:
+    st.metric("Публикаций", f"{len(filtered):,}".replace(",", " "))
+with k2:
+    st.metric("Суммарные цитирования", f"{filtered['cited_by'].sum():,}".replace(",", " "))
+with k3:
+    avg_pct = filtered["percentile_2024"].mean()
+    st.metric("Средний процентиль (2024)", f"{avg_pct:.1f}" if pd.notna(avg_pct) else "—")
+with k4:
+    top_q = filtered["quartile"].value_counts().head(1)
+    st.metric("Чаще всего квартиль", top_q.index[0] if len(top_q) > 0 else "—")
 
-# Экспорт
-st.markdown("### Экспорт")
-csv_bytes = filtered[show_cols].to_csv(index=False).encode("utf-8-sig")
-st.download_button("⬇️ CSV", csv_bytes, file_name="zh_scopus_export.csv", mime="text/csv")
+# ================= TABS ==================
+tab_table, tab_cards, tab_sources, tab_authors = st.tabs(
+    ["📊 Таблица", "📚 Scopus-вид", "🏛 Топ источники", "👨‍💻 Топ авторы"]
+)
 
-excel_buffer = BytesIO()
-with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-    filtered[show_cols].to_excel(writer, index=False, sheet_name="Export")
-st.download_button("⬇️ Excel", excel_buffer.getvalue(),
-                   file_name="zh_scopus_export.xlsx",
-                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+with tab_table:
+    st.subheader("Результаты фильтрации")
+    show_cols = ["authors_full", "title", "year", "source",
+                 "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
+    st.dataframe(filtered[show_cols], use_container_width=True, height=500)
 
-try:
-    pdf_bytes = dataframe_to_pdf_bytes(filtered[show_cols], title="Zh Scopus — Отчёт")
-    st.download_button("⬇️ PDF", pdf_bytes, file_name="zh_scopus_report.pdf", mime="application/pdf")
-except Exception as e:
-    st.warning(f"PDF экспорт недоступен: {e}")
+    # Экспорт
+    st.markdown("### Экспорт")
+    csv_bytes = filtered[show_cols].to_csv(index=False).encode("utf-8-sig")
+    st.download_button("⬇️ CSV", csv_bytes, file_name="zh_scopus_export.csv", mime="text/csv")
+
+    excel_buffer = BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+        filtered[show_cols].to_excel(writer, index=False, sheet_name="Export")
+    st.download_button("⬇️ Excel", excel_buffer.getvalue(),
+                       file_name="zh_scopus_export.xlsx",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    try:
+        pdf_bytes = dataframe_to_pdf_bytes(filtered[show_cols], title="Zh Scopus — Отчёт")
+        st.download_button("⬇️ PDF", pdf_bytes, file_name="zh_scopus_report.pdf", mime="application/pdf")
+    except Exception as e:
+        st.warning(f"PDF экспорт недоступен: {e}")
+
+with tab_cards:
+    st.subheader("Публикации в стиле Scopus")
+    for _, row in filtered.iterrows():
+        with st.container():
+            st.markdown(f"### {row.get('title', 'Без названия')}")
+            authors_fmt = str(row.get("authors_full", "—")).replace(";", "\n")
+            st.markdown(f"**Авторы:**\n{authors_fmt}")
+            st.markdown(f"**Источник:** {row.get('source', '—')}")
+            st.markdown(
+                f"**Год:** {row.get('year', '—')} | "
+                f"**Квартиль:** {row.get('quartile', '—')} | "
+                f"**Процентиль:** {row.get('percentile_2024', '—')}"
+            )
+            st.markdown(f"**Цитирования:** {row.get('cited_by', 0)}")
+            if pd.notna(row.get("doi_link", None)):
+                st.markdown(f"[DOI]({row['doi_link']})")
+            elif pd.notna(row.get("url", None)):
+                st.markdown(f"[Ссылка]({row['url']})")
+            st.markdown("---")
+
+with tab_sources:
+    st.subheader("Топ источников")
+    top_sources = (filtered.groupby("source")
+                   .agg(pub_count=("title", "count"), cites=("cited_by", "sum"))
+                   .sort_values("pub_count", ascending=False)
+                   .head(20))
+    st.bar_chart(top_sources["pub_count"])
+    st.dataframe(top_sources, use_container_width=True)
+
+with tab_authors:
+    st.subheader("Топ авторов")
+    exploded = (filtered.assign(_authors=filtered["authors_full"].astype(str).str.split(";"))
+                .explode("_authors"))
+    exploded["_authors"] = exploded["_authors"].str.strip()
+    top_authors = (exploded[exploded["_authors"] != ""]
+                   .groupby("_authors").agg(pub_count=("title", "count"),
+                                            cites=("cited_by", "sum"))
+                   .sort_values("pub_count", ascending=False).head(20))
+    st.bar_chart(top_authors["pub_count"])
+    st.dataframe(top_authors, use_container_width=True)
 
 st.caption("© Zh Scopus / Университет Жубанова")
