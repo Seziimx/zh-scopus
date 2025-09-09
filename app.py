@@ -184,12 +184,12 @@ with tab_table:
     filtered_display.index = filtered_display.index + 1
     filtered_display.insert(0, "№", filtered_display.index)
 
-    # Авторы: берём из "authors_raw" и ставим через перенос строки
+    # Авторы с <br> вместо ";"
     if "authors_raw" in filtered_display.columns:
         filtered_display["authors_fmt"] = (
             filtered_display["authors_raw"]
             .astype(str)
-            .str.replace(";", "\n")
+            .str.replace(";", "<br>")
         )
     else:
         filtered_display["authors_fmt"] = "—"
@@ -199,16 +199,14 @@ with tab_table:
                  "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered_display.columns]
 
-    # Отображаем с переносами строк
-    st.data_editor(
-        filtered_display[show_cols],
-        column_config={
-            "authors_fmt": st.column_config.TextColumn("Авторы", width="large")
-        },
-        use_container_width=True,
-        height=500,
-        disabled=True
+    # Формируем HTML-таблицу
+    html_table = filtered_display[show_cols].to_html(
+        escape=False,       # чтобы <br> не экранировалось
+        index=False
     )
+
+    st.markdown(html_table, unsafe_allow_html=True)
+
 
 
 
