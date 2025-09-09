@@ -4,6 +4,34 @@ import numpy as np
 from io import BytesIO
 from utils_pdf import dataframe_to_pdf_bytes
 
+st.markdown("""
+    <style>
+    /* Перенос строк в таблице */
+    .stDataFrame td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        max-width: 300px;
+    }
+
+    /* Основной акцент (кнопки, чекбоксы, радиокнопки) */
+    div.stButton > button,
+    div[data-baseweb="radio"] > div,
+    div[data-baseweb="checkbox"] > label,
+    .stSlider > div {
+        color: white !important;
+        background-color: #0D1B2A !important;  /* тёмно-синий */
+        border-radius: 5px;
+    }
+
+    /* Подсветка строки в таблице */
+    .stDataFrame tbody tr:hover td {
+        background-color: #0D1B2A !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
 st.set_page_config(
     page_title="Zh Scopus — Жубанов",
     page_icon="📚",
