@@ -1,8 +1,4 @@
 
----
-
-### 3. **utils_pdf.py**
-```python
 import io
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
