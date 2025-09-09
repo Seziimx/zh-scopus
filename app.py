@@ -15,7 +15,7 @@ st.set_page_config(
 # Header with logo and title
 col_logo, col_title = st.columns([1,4], vertical_alignment="center")
 with col_logo:
-    st.image("assets/logo.png", use_column_width=True)
+    st.image("assets/logo.png", use_container_width=True)
 with col_title:
     st.title("Zh Scopus — портал публикаций")
     st.caption("Университет Жубанова • Аналитика Scopus")
