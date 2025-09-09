@@ -178,9 +178,21 @@ tab_table, tab_cards, tab_sources, tab_authors = st.tabs(
 
 with tab_table:
     st.subheader("Результаты фильтрации")
-    show_cols = ["authors_full", "title", "year", "source",
-                 "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
-    st.dataframe(filtered[show_cols], use_container_width=True, height=500)
+    
+    # Добавляем нумерацию начиная с 1
+    filtered_display = filtered.copy()
+    filtered_display.insert(0, "№", range(1, len(filtered_display) + 1))
+    
+    # Авторы из "authors_raw", форматируем
+    if "authors_raw" in filtered_display.columns:
+        filtered_display["authors_fmt"] = filtered_display["authors_raw"].astype(str).str.replace(";", "\n")
+        show_cols = ["№", "authors_fmt", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
+    else:
+        show_cols = ["№", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi_link", "url", "issn"]
+
+    show_cols = [c for c in show_cols if c in filtered_display.columns]
+    st.dataframe(filtered_display[show_cols], use_container_width=True, height=500)
+
 
     # Экспорт
     st.markdown("### Экспорт")
@@ -202,33 +214,34 @@ with tab_table:
 
 with tab_cards:
     st.subheader("Публикации в стиле Scopus")
-    for _, row in filtered.iterrows():
+
+    for idx, row in enumerate(filtered.itertuples(), start=1):
         with st.container():
-            st.markdown(f"### {row.get('title', 'Без названия')}")
+            st.markdown(f"### {idx}. {getattr(row, 'title', 'Без названия')}")
             
-            # Авторы построчно
-            authors_fmt = str(row.get("authors_full", "—")).replace(";", "\n")
+            # Авторы из "authors_raw", через перенос строки
+            authors_fmt = str(getattr(row, "authors_raw", "—")).replace(";", "\n")
             st.markdown(f"**Авторы:**\n{authors_fmt}")
             
-            st.markdown(f"**Источник:** {row.get('source', '—')}")
+            st.markdown(f"**Источник:** {getattr(row, 'source', '—')}")
             st.markdown(
-                f"**Год:** {row.get('year', '—')} | "
-                f"**Квартиль:** {row.get('quartile', '—')} | "
-                f"**Процентиль:** {row.get('percentile_2024', '—')}"
+                f"**Год:** {getattr(row, 'year', '—')} | "
+                f"**Квартиль:** {getattr(row, 'quartile', '—')} | "
+                f"**Процентиль:** {getattr(row, 'percentile_2024', '—')}"
             )
-            st.markdown(f"**Цитирования:** {row.get('cited_by', 0)}")
+            st.markdown(f"**Цитирования:** {getattr(row, 'cited_by', 0)}")
 
             # 🔹 Ссылки
             links = []
-            if pd.notna(row.get("doi_link", None)):
-                links.append(f"[DOI]({row['doi_link']})")
-            if pd.notna(row.get("url", None)):
-                links.append(f"[Scopus ссылка]({row['url']})")
-            
+            if pd.notna(getattr(row, "doi_link", None)):
+                links.append(f"[DOI]({row.doi_link})")
+            if pd.notna(getattr(row, "url", None)):
+                links.append(f"[Scopus ссылка]({row.url})")
             if links:
                 st.markdown(" | ".join(links))
 
             st.markdown("---")
+
 
 
 with tab_sources:
