@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # Header with logo and title
-col_logo, col_title = st.columns([1,4], vertical_alignment="center")
+col_logo, col_title = st.columns([1, 4])
 with col_logo:
     st.image("assets/logo.png", use_container_width=True)
 with col_title:
@@ -23,7 +23,7 @@ with col_title:
 @st.cache_data
 def load_data(path: str, sheet: str = "ARTICLE") -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name=sheet, engine="openpyxl")
-    # Normalize columns we will use
+    # Normalize columns
     rename_map = {
         "Автор (ы)": "authors_raw",
         "Author full names": "authors_full",
@@ -45,7 +45,7 @@ def load_data(path: str, sheet: str = "ARTICLE") -> pd.DataFrame:
         df["cited_by"] = pd.to_numeric(df["cited_by"], errors="coerce").fillna(0).astype(int)
     if "percentile_2024" in df.columns:
         df["percentile_2024"] = pd.to_numeric(df["percentile_2024"], errors="coerce")
-    # For search: lower-case helper columns
+    # For search: lowercase helpers
     for col in ["authors_raw", "authors_full", "title", "source"]:
         if col in df.columns:
             df[f"_{col}_lc"] = df[col].astype(str).str.lower()
@@ -69,37 +69,32 @@ if preset == "Все годы":
     year_range = st.sidebar.slider("Диапазон лет", min_value=min_year, max_value=max_year,
                                    value=(min_year, max_year), step=1)
 elif preset == "Последние 5 лет":
-    year_range = (max(max_year-4, min_year), max_year)
+    year_range = (max(max_year - 4, min_year), max_year)
     st.sidebar.info(f"Выбрано: {year_range[0]}–{year_range[1]}")
 else:
-    year_range = (max(max_year-9, min_year), max_year)
+    year_range = (max(max_year - 9, min_year), max_year)
     st.sidebar.info(f"Выбрано: {year_range[0]}–{year_range[1]}")
 
-quartiles_all = ["Q1","Q2","Q3","Q4"]
+quartiles_all = ["Q1", "Q2", "Q3", "Q4"]
 selected_quartiles = st.sidebar.multiselect("Квартиль", quartiles_all, default=quartiles_all)
 
-percentile_min, percentile_max = 0, 100
-percentile_range = st.sidebar.slider("Процентиль 2024", min_value=percentile_min, max_value=percentile_max,
-                                     value=(percentile_min, percentile_max), step=1)
+percentile_range = st.sidebar.slider("Процентиль 2024", min_value=0, max_value=100,
+                                     value=(0, 100), step=1)
 
 search_query = st.sidebar.text_input("Поиск (автор/название/источник)", value="").strip().lower()
 
 # ============ Filtering Logic ============
 mask = pd.Series(True, index=df.index)
 
-# Year filter
 mask &= df["year"].between(year_range[0], year_range[1])
 
-# Quartile filter
 if "quartile" in df.columns:
     mask &= df["quartile"].astype(str).isin(selected_quartiles)
 
-# Percentile filter
 if "percentile_2024" in df.columns:
     p = df["percentile_2024"].fillna(-1)
     mask &= (p >= percentile_range[0]) & (p <= percentile_range[1])
 
-# Search filter (authors, title, source)
 if search_query:
     any_field = (
         df.get("_authors_raw_lc", pd.Series("", index=df.index)).str.contains(search_query, na=False) |
@@ -110,6 +105,24 @@ if search_query:
     mask &= any_field
 
 filtered = df[mask].copy()
+
+# ============ Sorting ============
+sort_column = st.sidebar.selectbox(
+    "Сортировать по",
+    options=["year", "cited_by", "percentile_2024", "quartile", "title"],
+    format_func=lambda x: {
+        "year": "Год",
+        "cited_by": "Цитирования",
+        "percentile_2024": "Процентиль 2024",
+        "quartile": "Квартиль",
+        "title": "Название"
+    }.get(x, x),
+    index=0
+)
+sort_order = st.sidebar.radio("Порядок", ["По возрастанию", "По убыванию"], index=1)
+ascending = (sort_order == "По возрастанию")
+if sort_column in filtered.columns:
+    filtered = filtered.sort_values(by=sort_column, ascending=ascending)
 
 # ============ KPI Cards ============
 k1, k2, k3, k4 = st.columns(4)
@@ -122,45 +135,60 @@ with k3:
     st.metric("Средний процентиль (2024)", f"{avg_pct:.1f}" if pd.notna(avg_pct) else "—")
 with k4:
     top_q = filtered["quartile"].value_counts().head(1)
-    top_q_str = top_q.index[0] if len(top_q)>0 else "—"
-    st.metric("Чаще всего квартиль", top_q_str)
+    st.metric("Чаще всего квартиль", top_q.index[0] if len(top_q) > 0 else "—")
 
-# ============ Tabs with data and charts ============
-tab_data, tab_sources, tab_authors = st.tabs(["Данные", "Топ источники", "Топ авторы"])
+# ============ Tabs ============
+tab_table, tab_cards, tab_sources, tab_authors = st.tabs(["📊 Таблица", "📚 Scopus-вид", "🏛 Топ источники", "👨‍💻 Топ авторы"])
 
-with tab_data:
+with tab_table:
     st.subheader("Результаты фильтрации")
-    show_cols = ["authors_full","title","year","source","quartile","percentile_2024","cited_by","doi","url","issn"]
+    show_cols = ["authors_full", "title", "year", "source", "quartile", "percentile_2024", "cited_by", "doi", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered.columns]
     st.dataframe(filtered[show_cols], use_container_width=True, height=500)
 
     # Export buttons
     st.markdown("### Экспорт")
-    # CSV
     csv_bytes = filtered[show_cols].to_csv(index=False).encode("utf-8-sig")
     st.download_button("⬇️ Скачать CSV", csv_bytes, file_name="zh_scopus_export.csv", mime="text/csv")
 
-    # Excel
     excel_buffer = BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
         filtered[show_cols].to_excel(writer, index=False, sheet_name="Export")
     st.download_button("⬇️ Скачать Excel", excel_buffer.getvalue(), file_name="zh_scopus_export.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # PDF (basic)
     try:
         pdf_bytes = dataframe_to_pdf_bytes(filtered[show_cols], title="Zh Scopus — Отчёт (фильтр)")
         st.download_button("⬇️ Скачать PDF (бета)", pdf_bytes, file_name="zh_scopus_report.pdf", mime="application/pdf")
     except Exception as e:
         st.warning(f"PDF экспорт недоступен: {e}")
 
+with tab_cards:
+    st.subheader("Результаты (карточки в стиле Scopus)")
+    for _, row in filtered.iterrows():
+        with st.container():
+            st.markdown(f"### {row.get('title', 'Без названия')}")
+            st.markdown(f"**Авторы:** {row.get('authors_full', '—')}")
+            st.markdown(f"**Источник:** {row.get('source', '—')}")
+            st.markdown(
+                f"**Год:** {row.get('year', '—')} | "
+                f"**Квартиль:** {row.get('quartile', '—')} | "
+                f"**Процентиль:** {row.get('percentile_2024', '—')}"
+            )
+            st.markdown(f"**Цитирования:** {row.get('cited_by', 0)}")
+            if pd.notna(row.get("doi", None)):
+                st.markdown(f"[DOI]({row['doi']})")
+            elif pd.notna(row.get("url", None)):
+                st.markdown(f"[Ссылка]({row['url']})")
+            st.markdown("---")
+
 with tab_sources:
     st.subheader("Топ 10 источников по числу публикаций")
     if "source" in filtered.columns:
         top_sources = (filtered.groupby("source")
-                               .agg(pub_count=("title","count"), cites=("cited_by","sum"))
-                               .sort_values("pub_count", ascending=False)
-                               .head(10))
+                       .agg(pub_count=("title", "count"), cites=("cited_by", "sum"))
+                       .sort_values("pub_count", ascending=False)
+                       .head(10))
         st.bar_chart(top_sources["pub_count"])
         st.dataframe(top_sources, use_container_width=True)
     else:
@@ -169,12 +197,12 @@ with tab_sources:
 with tab_authors:
     st.subheader("Топ 10 авторов по числу публикаций")
     if "authors_full" in filtered.columns:
-        exploded = (filtered.assign(_authors = filtered["authors_full"].astype(str).str.split(";"))
-                               .explode("_authors"))
+        exploded = (filtered.assign(_authors=filtered["authors_full"].astype(str).str.split(";"))
+                    .explode("_authors"))
         exploded["_authors"] = exploded["_authors"].str.strip()
-        top_authors = (exploded[exploded["_authors"]!=""]
-                       .groupby("_authors").agg(pub_count=("title","count"),
-                                                cites=("cited_by","sum"))
+        top_authors = (exploded[exploded["_authors"] != ""]
+                       .groupby("_authors").agg(pub_count=("title", "count"),
+                                                cites=("cited_by", "sum"))
                        .sort_values("pub_count", ascending=False).head(10))
         st.bar_chart(top_authors["pub_count"])
         st.dataframe(top_authors, use_container_width=True)
