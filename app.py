@@ -179,22 +179,37 @@ tab_table, tab_cards, tab_sources, tab_authors = st.tabs(
 with tab_table:
     st.subheader("Результаты фильтрации")
 
-    # Нумерация + формат авторов
+    # Копия данных + нумерация
     filtered_display = filtered.copy().reset_index(drop=True)
     filtered_display.index = filtered_display.index + 1
     filtered_display.insert(0, "№", filtered_display.index)
 
-    # Авторы: берём из "authors_raw" и ставим через Enter
+    # Авторы: берём из "authors_raw" и ставим через перенос строки
     if "authors_raw" in filtered_display.columns:
-        filtered_display["authors_fmt"] = filtered_display["authors_raw"].astype(str).str.replace(";", "\n")
+        filtered_display["authors_fmt"] = (
+            filtered_display["authors_raw"]
+            .astype(str)
+            .str.replace(";", "\n")
+        )
     else:
         filtered_display["authors_fmt"] = "—"
 
-    show_cols = ["№", "authors_fmt", "title", "year", "source", "quartile",
-                 "percentile_2024", "cited_by", "doi_link", "url", "issn"]
+    show_cols = ["№", "authors_fmt", "title", "year", "source",
+                 "quartile", "percentile_2024", "cited_by",
+                 "doi_link", "url", "issn"]
     show_cols = [c for c in show_cols if c in filtered_display.columns]
 
-    st.dataframe(filtered_display[show_cols], use_container_width=True, height=500)
+    # Отображаем с переносами строк
+    st.data_editor(
+        filtered_display[show_cols],
+        column_config={
+            "authors_fmt": st.column_config.TextColumn("Авторы", width="large")
+        },
+        use_container_width=True,
+        height=500,
+        disabled=True
+    )
+
 
 
 
